@@ -245,6 +245,93 @@
       transform: translateY(-2px);
     }
 
+    .orders-panel {
+      margin-top: 28px;
+      padding: 22px;
+      border-radius: 22px;
+      backdrop-filter: blur(14px);
+    }
+
+    body.dark .orders-panel {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+    }
+
+    body.light .orders-panel {
+      background: rgba(255,255,255,0.75);
+      border: 1px solid rgba(0,0,0,0.08);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+    }
+
+    .orders-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    .orders-title {
+      font-size: 22px;
+      font-weight: bold;
+    }
+
+    .orders-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .order-item {
+      padding: 15px;
+      border-radius: 16px;
+    }
+
+    body.dark .order-item {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    body.light .order-item {
+      background: rgba(255,255,255,0.95);
+      border: 1px solid rgba(0,0,0,0.06);
+    }
+
+    .order-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+
+    .order-name {
+      font-weight: bold;
+      font-size: 16px;
+    }
+
+    .order-message {
+      margin-top: 8px;
+      opacity: 0.9;
+      line-height: 1.5;
+      font-size: 14px;
+    }
+
+    .order-status {
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: bold;
+      color: white;
+      white-space: nowrap;
+    }
+
+    .order-pending { background: linear-gradient(135deg, #f59e0b, #d97706); }
+    .order-checking { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+    .order-completed { background: linear-gradient(135deg, #22c55e, #16a34a); }
+    .order-cancelled { background: linear-gradient(135deg, #ef4444, #dc2626); }
+
     .contact-btn {
       position: fixed;
       left: 20px;
@@ -402,6 +489,7 @@
         <button class="btn" id="adminPanelBtn" style="display:none;" onclick="window.location.href='admin.html'">Admin Panel</button>
         <div class="balance-box">Balance: <span id="balanceAmount">0</span> UZS</div>
         <button class="btn deposit-btn" onclick="window.location.href='deposit.html'">Deposit</button>
+        <button class="btn" onclick="window.location.href='notifications.html'">Notifications</button>
         <button class="btn logout-btn" onclick="logoutUser()">Logout</button>
       </div>
     </div>
@@ -427,8 +515,21 @@
         <div class="price">5,000 UZS</div>
         <button class="buy" onclick="buyService(2)">Buy</button>
       </div>
+    </div>
 
-     
+    <div class="orders-panel">
+      <div class="orders-top">
+        <div class="orders-title">My Service Box</div>
+        <button class="btn" onclick="loadMyOrders()">Refresh</button>
+      </div>
+      <div class="orders-list" id="myOrdersList">
+        <div class="order-item">
+          <div class="order-name">No services bought yet</div>
+          <div class="order-message">After buying a service, status and admin message will appear here.</div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <a class="contact-btn" href="https://t.me/Sohapro" target="_blank">Contact</a>
   <button class="theme-btn" id="themeToggle">☀️ Theme</button>
@@ -440,6 +541,7 @@
     const balanceAmount = document.getElementById("balanceAmount");
     const adminPanelBtn = document.getElementById("adminPanelBtn");
     const profileAvatar = document.getElementById("profileAvatar");
+    const myOrdersList = document.getElementById("myOrdersList");
 
     const token = localStorage.getItem("token");
     const savedUser = JSON.parse(localStorage.getItem("user") || "{}");
@@ -487,6 +589,61 @@
       }
     }
 
+
+    function orderStatusClass(status) {
+      if (status === "completed") return "order-completed";
+      if (status === "cancelled" || status === "declined") return "order-cancelled";
+      if (status === "checking") return "order-checking";
+      return "order-pending";
+    }
+
+    function orderStatusText(status) {
+      if (status === "completed") return "Completed";
+      if (status === "cancelled" || status === "declined") return "Cancelled";
+      if (status === "checking") return "Checking";
+      return "Pending";
+    }
+
+    async function loadMyOrders() {
+      try {
+        const response = await fetch(`${API_URL}/api/services/my-orders`, {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          myOrdersList.innerHTML = `<div class="order-item"><div class="order-message">${data.message || "Could not load services."}</div></div>`;
+          return;
+        }
+
+        if (!data.length) {
+          myOrdersList.innerHTML = `
+            <div class="order-item">
+              <div class="order-name">No services bought yet</div>
+              <div class="order-message">After buying a service, status and admin message will appear here.</div>
+            </div>
+          `;
+          return;
+        }
+
+        myOrdersList.innerHTML = data.map(order => `
+          <div class="order-item">
+            <div class="order-row">
+              <div>
+                <div class="order-name">${order.service_name}</div>
+                <div class="order-message">Bought: ${new Date(order.created_at).toLocaleString()}</div>
+              </div>
+              <div class="order-status ${orderStatusClass(order.status)}">${orderStatusText(order.status)}</div>
+            </div>
+            <div class="order-message">${order.admin_message || "Admin message/result has not been sent yet."}</div>
+          </div>
+        `).join("");
+      } catch (error) {
+        myOrdersList.innerHTML = `<div class="order-item"><div class="order-message">Backend route needed: /api/services/my-orders</div></div>`;
+      }
+    }
+
     async function buyService(serviceId) {
     const ok = confirm("Are you sure you want to buy this service?");
     if (!ok) return;
@@ -509,7 +666,11 @@
       }
 
       await loadUserProfile();
-      window.location.href = data.redirect;
+      await loadMyOrders();
+      alert(data.message || "Service bought. Check My Service Box for status.");
+      if (data.redirect) {
+        window.location.href = data.redirect;
+      }
     } catch (error) {
       alert("Server error. Check backend route /api/services/buy");
       console.error(error);
@@ -537,6 +698,7 @@
     }
 
     loadUserProfile();
+    loadMyOrders();
   </script>
 
 </body>
