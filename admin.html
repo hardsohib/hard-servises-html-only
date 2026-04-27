@@ -214,6 +214,35 @@
       background: linear-gradient(135deg, #ef4444, #dc2626);
     }
 
+
+    .checking {
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+    }
+
+    .message-input {
+      width: 100%;
+      min-height: 75px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: none;
+      outline: none;
+      resize: vertical;
+      margin: 10px 0;
+      font-size: 14px;
+    }
+
+    body:not(.light) .message-input {
+      background: rgba(255,255,255,0.06);
+      color: white;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    body.light .message-input {
+      background: white;
+      color: #111;
+      border: 1px solid rgba(0,0,0,0.08);
+    }
+
     .theme-btn {
       position: fixed;
       right: 20px;
@@ -274,6 +303,16 @@
       </div>
     </div>
 
+
+
+    <div class="section">
+      <div class="section-title">Service Orders</div>
+      <div class="list" id="ordersList">
+        <div class="empty">Loading service orders...</div>
+      </div>
+    </div>
+
+
     <div class="section">
       <div class="section-title">Deposits</div>
       <div class="list" id="depositsList">
@@ -290,6 +329,7 @@
     const savedUser = JSON.parse(localStorage.getItem("user") || "{}");
     const usersList = document.getElementById("usersList");
     const depositsList = document.getElementById("depositsList");
+    const ordersList = document.getElementById("ordersList");
     const themeToggle = document.getElementById("themeToggle");
     const body = document.body;
     const searchInput = document.getElementById("searchInput");
@@ -321,13 +361,15 @@
 
     function getStatusClass(status) {
       if (status === "completed") return "completed";
-      if (status === "declined") return "declined";
+      if (status === "declined" || status === "cancelled") return "declined";
+      if (status === "checking") return "checking";
       return "progress";
     }
 
     function getStatusText(status) {
       if (status === "completed") return "Completed";
-      if (status === "declined") return "Declined";
+      if (status === "declined" || status === "cancelled") return "Declined";
+      if (status === "checking") return "Checking";
       return "In Progress";
     }
 
@@ -435,6 +477,78 @@
         `).join("");
       } catch (error) {
         depositsList.innerHTML = `<div class="empty">Server error.</div>`;
+      }
+    }
+
+
+    async function loadOrders() {
+      try {
+        const response = await fetch(`${API_URL}/api/admin/orders`, {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          ordersList.innerHTML = `<div class="empty">${data.message || "Failed to load service orders"}</div>`;
+          return;
+        }
+
+        if (!data.length) {
+          ordersList.innerHTML = `<div class="empty">No service orders yet.</div>`;
+          return;
+        }
+
+        ordersList.innerHTML = data.map(order => `
+          <div class="card">
+            <div class="row">
+              <div>
+                <div class="user-name">${order.service_name}</div>
+                <div class="muted">Buyer: ${order.name} • ${order.phone}</div>
+              </div>
+              <div>
+                <div class="muted">${Number(order.price || 0).toLocaleString("en-US")} UZS</div>
+                <div class="status ${getStatusClass(order.status)}">${getStatusText(order.status)}</div>
+              </div>
+            </div>
+            <div class="muted">Bought: ${new Date(order.created_at).toLocaleString()}</div>
+            <textarea class="message-input" id="message-${order.id}" placeholder="Example: You bought Speaking Test service and your score is 6.">${order.admin_message || ""}</textarea>
+            <div class="actions">
+              <button class="small-btn info-btn" onclick="updateOrder(${order.id}, 'checking')">Mark Checking</button>
+              <button class="small-btn approve-btn" onclick="updateOrder(${order.id}, 'completed')">Send Result / Complete</button>
+              <button class="small-btn decline-btn" onclick="updateOrder(${order.id}, 'cancelled')">Cancel</button>
+            </div>
+          </div>
+        `).join("");
+      } catch (error) {
+        ordersList.innerHTML = `<div class="empty">Backend route needed: /api/admin/orders</div>`;
+      }
+    }
+
+    async function updateOrder(orderId, status) {
+      const admin_message = document.getElementById(`message-${orderId}`).value.trim();
+
+      try {
+        const response = await fetch(`${API_URL}/api/admin/order/${orderId}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify({ status, admin_message })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          alert(data.message || "Failed to update order.");
+          return;
+        }
+
+        alert(data.message || "Order updated.");
+        loadOrders();
+      } catch (error) {
+        alert("Backend route needed: /api/admin/order/:id");
       }
     }
 
@@ -590,6 +704,7 @@
 
     loadUsers();
     loadDeposits();
+    loadOrders();
   </script>
 </body>
 </html>
