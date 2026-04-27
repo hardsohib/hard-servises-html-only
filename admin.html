@@ -243,6 +243,85 @@
       border: 1px solid rgba(0,0,0,0.08);
     }
 
+
+    .badge-wrap {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .badge {
+      position: absolute;
+      top: -9px;
+      right: -9px;
+      min-width: 22px;
+      height: 22px;
+      padding: 0 6px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      color: white;
+      font-size: 12px;
+      font-weight: bold;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 6px 14px rgba(239,68,68,0.35);
+      z-index: 5;
+    }
+
+    .orders-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    .orders-search {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: none;
+      outline: none;
+      font-size: 15px;
+      margin-bottom: 16px;
+    }
+
+    body:not(.light) .orders-search {
+      background: rgba(255,255,255,0.06);
+      color: white;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    body.light .orders-search {
+      background: white;
+      color: #111;
+      border: 1px solid rgba(0,0,0,0.08);
+    }
+
+    .orders-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    .orders-column-title {
+      font-size: 18px;
+      font-weight: bold;
+      margin-bottom: 12px;
+    }
+
+    .delete-btn {
+      background: linear-gradient(135deg, #991b1b, #ef4444);
+    }
+
+    @media (max-width: 900px) {
+      .orders-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
     .theme-btn {
       position: fixed;
       right: 20px;
@@ -281,6 +360,10 @@
     <div class="topbar">
       <div class="title">Admin Panel</div>
       <div class="top-actions">
+        <div class="badge-wrap">
+          <button class="btn" onclick="document.getElementById('serviceOrdersSection').scrollIntoView({behavior:'smooth'})">Service Orders</button>
+          <span class="badge" id="adminOrderBadge">0</span>
+        </div>
         <button class="btn" onclick="window.location.href='services.html'">Back</button>
         <button class="btn logout-btn" onclick="logoutUser()">Logout</button>
       </div>
@@ -305,10 +388,36 @@
 
 
 
-    <div class="section">
-      <div class="section-title">Service Orders</div>
-      <div class="list" id="ordersList">
-        <div class="empty">Loading service orders...</div>
+    <div class="section" id="serviceOrdersSection">
+      <div class="orders-header">
+        <div class="section-title">Service Orders</div>
+        <div class="badge-wrap">
+          <button class="btn" onclick="loadOrders()">Refresh Orders</button>
+          <span class="badge" id="adminOrderBadge2">0</span>
+        </div>
+      </div>
+
+      <input
+        type="text"
+        id="ordersSearchInput"
+        class="orders-search"
+        placeholder="Search orders by name, phone, service, status, or message"
+      />
+
+      <div class="orders-grid">
+        <div>
+          <div class="orders-column-title">Pending / Checking</div>
+          <div class="list" id="pendingOrdersList">
+            <div class="empty">Loading pending orders...</div>
+          </div>
+        </div>
+
+        <div>
+          <div class="orders-column-title">Completed / Cancelled</div>
+          <div class="list" id="completedOrdersList">
+            <div class="empty">Loading completed orders...</div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -327,14 +436,22 @@
     const API_URL = "https://hard-service-buy-sell.onrender.com";
     const token = localStorage.getItem("token");
     const savedUser = JSON.parse(localStorage.getItem("user") || "{}");
+
     const usersList = document.getElementById("usersList");
     const depositsList = document.getElementById("depositsList");
-    const ordersList = document.getElementById("ordersList");
+    const pendingOrdersList = document.getElementById("pendingOrdersList");
+    const completedOrdersList = document.getElementById("completedOrdersList");
+
     const themeToggle = document.getElementById("themeToggle");
     const body = document.body;
     const searchInput = document.getElementById("searchInput");
+    const ordersSearchInput = document.getElementById("ordersSearchInput");
+
+    const adminOrderBadge = document.getElementById("adminOrderBadge");
+    const adminOrderBadge2 = document.getElementById("adminOrderBadge2");
 
     let allUsers = [];
+    let allOrders = [];
 
     if (!token) {
       window.location.href = "index.html";
@@ -362,15 +479,22 @@
     function getStatusClass(status) {
       if (status === "completed") return "completed";
       if (status === "declined" || status === "cancelled") return "declined";
-      if (status === "checking") return "checking";
+      if (status === "checking" || status === "in_progress") return "checking";
       return "progress";
     }
 
     function getStatusText(status) {
       if (status === "completed") return "Completed";
-      if (status === "declined" || status === "cancelled") return "Declined";
-      if (status === "checking") return "Checking";
-      return "In Progress";
+      if (status === "declined" || status === "cancelled") return "Cancelled";
+      if (status === "checking" || status === "in_progress") return "Checking";
+      return "Pending";
+    }
+
+    function escapeValue(value) {
+      return String(value || "")
+        .replace(/\\/g, "\\\\")
+        .replace(/'/g, "\\'")
+        .replace(/"/g, "&quot;");
     }
 
     function renderUsers(users) {
@@ -400,17 +524,10 @@
           <div class="actions">
             <button class="small-btn balance-btn" onclick="changeBalance(${user.id}, ${user.balance})">Change Balance</button>
             <button class="small-btn password-btn" onclick="changePassword(${user.id})">Reset Password</button>
-            <button class="small-btn info-btn" onclick="changeConnections(${user.id}, '${escapeValue(user.name)}', '${escapeValue(user.phone)}', '${escapeValue(user.gmail || "")}', '${escapeValue(user.telegram || "")}')">Change Gmail / Telegram</button>
+            <button class="small-btn info-btn" onclick="changeConnections(${user.id}, '${escapeValue(user.name)}', '${escapeValue(user.phone)}', '${escapeValue(user.gmail)}', '${escapeValue(user.telegram)}')">Change Gmail / Telegram</button>
           </div>
         </div>
       `).join("");
-    }
-
-    function escapeValue(value) {
-      return String(value)
-        .replace(/\\/g, "\\\\")
-        .replace(/'/g, "\\'")
-        .replace(/"/g, "&quot;");
     }
 
     async function loadUsers() {
@@ -430,6 +547,169 @@
         renderUsers(allUsers);
       } catch (error) {
         usersList.innerHTML = `<div class="empty">Server error.</div>`;
+      }
+    }
+
+    function updateAdminBadges(orders) {
+      const count = orders.filter(order =>
+        order.status === "pending" ||
+        order.status === "checking" ||
+        order.status === "in_progress"
+      ).length;
+
+      [adminOrderBadge, adminOrderBadge2].forEach(badge => {
+        if (!badge) return;
+        badge.textContent = count;
+        badge.style.display = count > 0 ? "inline-flex" : "none";
+      });
+    }
+
+    function orderMatchesSearch(order, value) {
+      if (!value) return true;
+
+      const text = [
+        order.name,
+        order.phone,
+        order.gmail,
+        order.telegram,
+        order.service_name,
+        order.status,
+        order.admin_message,
+        order.price
+      ].join(" ").toLowerCase();
+
+      return text.includes(value);
+    }
+
+    function renderOrders() {
+      const value = (ordersSearchInput.value || "").trim().toLowerCase();
+      const filtered = allOrders.filter(order => orderMatchesSearch(order, value));
+
+      const activeOrders = filtered.filter(order =>
+        order.status === "pending" ||
+        order.status === "checking" ||
+        order.status === "in_progress"
+      );
+
+      const doneOrders = filtered.filter(order =>
+        order.status === "completed" ||
+        order.status === "cancelled" ||
+        order.status === "declined"
+      );
+
+      renderOrderList(pendingOrdersList, activeOrders, "No pending/checking orders.");
+      renderOrderList(completedOrdersList, doneOrders, "No completed/cancelled orders.");
+      updateAdminBadges(allOrders);
+    }
+
+    function renderOrderList(container, orders, emptyText) {
+      if (!orders.length) {
+        container.innerHTML = `<div class="empty">${emptyText}</div>`;
+        return;
+      }
+
+      container.innerHTML = orders.map(order => `
+        <div class="card">
+          <div class="row">
+            <div>
+              <div class="user-name">${order.service_name || "Service"}</div>
+              <div class="muted">Buyer: ${order.name || "-"} • ${order.phone || "-"}</div>
+            </div>
+            <div>
+              <div class="muted">${Number(order.price || 0).toLocaleString("en-US")} UZS</div>
+              <div class="status ${getStatusClass(order.status)}">${getStatusText(order.status)}</div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="muted">Gmail: ${order.gmail || "-"}</div>
+            <div class="muted">Telegram: ${order.telegram || "-"}</div>
+          </div>
+
+          <div class="muted">Bought: ${new Date(order.created_at).toLocaleString()}</div>
+
+          <textarea class="message-input" id="message-${order.id}" placeholder="Example: You bought Speaking Test service and your score is 6.">${order.admin_message || ""}</textarea>
+
+          <div class="actions">
+            <button class="small-btn info-btn" onclick="updateOrder(${order.id}, 'checking')">Mark Checking</button>
+            <button class="small-btn approve-btn" onclick="updateOrder(${order.id}, 'completed')">Send Result / Complete</button>
+            <button class="small-btn decline-btn" onclick="updateOrder(${order.id}, 'cancelled')">Cancel</button>
+            <button class="small-btn delete-btn" onclick="deleteOrder(${order.id})">Delete</button>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    async function loadOrders() {
+      try {
+        const response = await fetch(`${API_URL}/api/admin/orders`, {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          pendingOrdersList.innerHTML = `<div class="empty">${data.message || "Failed to load service orders"}</div>`;
+          completedOrdersList.innerHTML = `<div class="empty">No data.</div>`;
+          return;
+        }
+
+        allOrders = data;
+        renderOrders();
+      } catch (error) {
+        pendingOrdersList.innerHTML = `<div class="empty">Backend route needed: /api/admin/orders</div>`;
+        completedOrdersList.innerHTML = `<div class="empty">Server error.</div>`;
+      }
+    }
+
+    async function updateOrder(orderId, status) {
+      const admin_message = document.getElementById(`message-${orderId}`).value.trim();
+
+      try {
+        const response = await fetch(`${API_URL}/api/admin/order/${orderId}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify({ status, admin_message })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          alert(data.message || "Failed to update order.");
+          return;
+        }
+
+        alert(data.message || "Order updated.");
+        loadOrders();
+      } catch (error) {
+        alert("Backend route needed: /api/admin/order/:id");
+      }
+    }
+
+    async function deleteOrder(orderId) {
+      const ok = confirm("Delete this service order?");
+      if (!ok) return;
+
+      try {
+        const response = await fetch(`${API_URL}/api/admin/order/${orderId}`, {
+          method: "DELETE",
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          alert(data.message || "Failed to delete order.");
+          return;
+        }
+
+        alert(data.message || "Order deleted.");
+        loadOrders();
+      } catch (error) {
+        alert("Backend route needed: DELETE /api/admin/order/:id");
       }
     }
 
@@ -477,78 +757,6 @@
         `).join("");
       } catch (error) {
         depositsList.innerHTML = `<div class="empty">Server error.</div>`;
-      }
-    }
-
-
-    async function loadOrders() {
-      try {
-        const response = await fetch(`${API_URL}/api/admin/orders`, {
-          headers: { "Authorization": `Bearer ${token}` }
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          ordersList.innerHTML = `<div class="empty">${data.message || "Failed to load service orders"}</div>`;
-          return;
-        }
-
-        if (!data.length) {
-          ordersList.innerHTML = `<div class="empty">No service orders yet.</div>`;
-          return;
-        }
-
-        ordersList.innerHTML = data.map(order => `
-          <div class="card">
-            <div class="row">
-              <div>
-                <div class="user-name">${order.service_name}</div>
-                <div class="muted">Buyer: ${order.name} • ${order.phone}</div>
-              </div>
-              <div>
-                <div class="muted">${Number(order.price || 0).toLocaleString("en-US")} UZS</div>
-                <div class="status ${getStatusClass(order.status)}">${getStatusText(order.status)}</div>
-              </div>
-            </div>
-            <div class="muted">Bought: ${new Date(order.created_at).toLocaleString()}</div>
-            <textarea class="message-input" id="message-${order.id}" placeholder="Example: You bought Speaking Test service and your score is 6.">${order.admin_message || ""}</textarea>
-            <div class="actions">
-              <button class="small-btn info-btn" onclick="updateOrder(${order.id}, 'checking')">Mark Checking</button>
-              <button class="small-btn approve-btn" onclick="updateOrder(${order.id}, 'completed')">Send Result / Complete</button>
-              <button class="small-btn decline-btn" onclick="updateOrder(${order.id}, 'cancelled')">Cancel</button>
-            </div>
-          </div>
-        `).join("");
-      } catch (error) {
-        ordersList.innerHTML = `<div class="empty">Backend route needed: /api/admin/orders</div>`;
-      }
-    }
-
-    async function updateOrder(orderId, status) {
-      const admin_message = document.getElementById(`message-${orderId}`).value.trim();
-
-      try {
-        const response = await fetch(`${API_URL}/api/admin/order/${orderId}`, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`
-          },
-          body: JSON.stringify({ status, admin_message })
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          alert(data.message || "Failed to update order.");
-          return;
-        }
-
-        alert(data.message || "Order updated.");
-        loadOrders();
-      } catch (error) {
-        alert("Backend route needed: /api/admin/order/:id");
       }
     }
 
@@ -702,9 +910,13 @@
       renderUsers(filteredUsers);
     });
 
+    ordersSearchInput.addEventListener("input", renderOrders);
+
     loadUsers();
     loadDeposits();
     loadOrders();
+
+    setInterval(loadOrders, 30000);
   </script>
 </body>
 </html>
