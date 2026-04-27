@@ -99,6 +99,31 @@
       border: none !important;
     }
 
+    .badge-wrap {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .badge {
+      position: absolute;
+      top: -9px;
+      right: -9px;
+      min-width: 22px;
+      height: 22px;
+      padding: 0 6px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      color: white;
+      font-size: 12px;
+      font-weight: bold;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 6px 14px rgba(239,68,68,0.35);
+      z-index: 5;
+    }
+
     .balance-box {
       padding: 11px 16px;
       border-radius: 12px;
@@ -489,7 +514,10 @@
         <button class="btn" id="adminPanelBtn" style="display:none;" onclick="window.location.href='admin.html'">Admin Panel</button>
         <div class="balance-box">Balance: <span id="balanceAmount">0</span> UZS</div>
         <button class="btn deposit-btn" onclick="window.location.href='deposit.html'">Deposit</button>
-        <button class="btn" onclick="window.location.href='notifications.html'">Notifications</button>
+        <div class="badge-wrap">
+          <button class="btn" onclick="openNotifications()">Notifications</button>
+          <span class="badge" id="userNotificationBadge">0</span>
+        </div>
         <button class="btn logout-btn" onclick="logoutUser()">Logout</button>
       </div>
     </div>
@@ -542,9 +570,11 @@
     const adminPanelBtn = document.getElementById("adminPanelBtn");
     const profileAvatar = document.getElementById("profileAvatar");
     const myOrdersList = document.getElementById("myOrdersList");
+    const userNotificationBadge = document.getElementById("userNotificationBadge");
 
     const token = localStorage.getItem("token");
     const savedUser = JSON.parse(localStorage.getItem("user") || "{}");
+    let unreadOrderCount = 0;
 
     if (!token) {
       window.location.href = "index.html";
@@ -604,6 +634,33 @@
       return "Pending";
     }
 
+    function updateUserNotificationBadge(orders) {
+      unreadOrderCount = orders.filter(order =>
+        Number(order.is_read || 0) === 0 &&
+        (
+          order.status === "completed" ||
+          order.status === "cancelled" ||
+          order.status === "declined" ||
+          (order.admin_message && !order.admin_message.includes("Please wait for admin result"))
+        )
+      ).length;
+
+      if (!userNotificationBadge) return;
+      userNotificationBadge.textContent = unreadOrderCount;
+      userNotificationBadge.style.display = unreadOrderCount > 0 ? "inline-flex" : "none";
+    }
+
+    async function openNotifications() {
+      try {
+        await fetch(`${API_URL}/api/services/my-orders/read`, {
+          method: "PUT",
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+      } catch (error) {}
+
+      window.location.href = "notifications.html";
+    }
+
     async function loadMyOrders() {
       try {
         const response = await fetch(`${API_URL}/api/services/my-orders`, {
@@ -616,6 +673,8 @@
           myOrdersList.innerHTML = `<div class="order-item"><div class="order-message">${data.message || "Could not load services."}</div></div>`;
           return;
         }
+
+        updateUserNotificationBadge(data);
 
         if (!data.length) {
           myOrdersList.innerHTML = `
@@ -699,6 +758,8 @@
 
     loadUserProfile();
     loadMyOrders();
+
+    setInterval(loadMyOrders, 30000);
   </script>
 
 </body>
