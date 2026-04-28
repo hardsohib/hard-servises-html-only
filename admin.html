@@ -322,6 +322,36 @@
       }
     }
 
+
+    .audio-player {
+      width: 100%;
+      margin: 10px 0;
+    }
+
+    .result-input {
+      width: 100%;
+      min-height: 75px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: none;
+      outline: none;
+      resize: vertical;
+      margin: 10px 0;
+      font-size: 14px;
+    }
+
+    body:not(.light) .result-input {
+      background: rgba(255,255,255,0.06);
+      color: white;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    body.light .result-input {
+      background: white;
+      color: #111;
+      border: 1px solid rgba(0,0,0,0.08);
+    }
+
     .theme-btn {
       position: fixed;
       right: 20px;
@@ -360,6 +390,10 @@
     <div class="topbar">
       <div class="title">Admin Panel</div>
       <div class="top-actions">
+        <div class="badge-wrap">
+          <button class="btn" onclick="document.getElementById('speakingTestsSection').scrollIntoView({behavior:'smooth'})">Speaking Tests</button>
+          <span class="badge" id="speakingTestBadge">0</span>
+        </div>
         <div class="badge-wrap">
           <button class="btn" onclick="document.getElementById('serviceOrdersSection').scrollIntoView({behavior:'smooth'})">Service Orders</button>
           <span class="badge" id="adminOrderBadge">0</span>
@@ -422,6 +456,29 @@
     </div>
 
 
+
+    <div class="section" id="speakingTestsSection">
+      <div class="orders-header">
+        <div class="section-title">Speaking Test Submissions</div>
+        <div class="badge-wrap">
+          <button class="btn" onclick="loadSpeakingTests()">Refresh Tests</button>
+          <span class="badge" id="speakingTestBadge2">0</span>
+        </div>
+      </div>
+
+      <input
+        type="text"
+        id="speakingSearchInput"
+        class="orders-search"
+        placeholder="Search speaking tests by name, phone, video, status, or result"
+      />
+
+      <div class="list" id="speakingTestsList">
+        <div class="empty">Loading speaking tests...</div>
+      </div>
+    </div>
+
+
     <div class="section">
       <div class="section-title">Deposits</div>
       <div class="list" id="depositsList">
@@ -450,8 +507,14 @@
     const adminOrderBadge = document.getElementById("adminOrderBadge");
     const adminOrderBadge2 = document.getElementById("adminOrderBadge2");
 
+    const speakingTestsList = document.getElementById("speakingTestsList");
+    const speakingSearchInput = document.getElementById("speakingSearchInput");
+    const speakingTestBadge = document.getElementById("speakingTestBadge");
+    const speakingTestBadge2 = document.getElementById("speakingTestBadge2");
+
     let allUsers = [];
     let allOrders = [];
+    let allSpeakingTests = [];
 
     if (!token) {
       window.location.href = "index.html";
@@ -684,6 +747,7 @@
 
         alert(data.message || "Order updated.");
         loadOrders();
+    loadSpeakingTests();
       } catch (error) {
         alert("Backend route needed: /api/admin/order/:id");
       }
@@ -708,10 +772,158 @@
 
         alert(data.message || "Order deleted.");
         loadOrders();
+    loadSpeakingTests();
       } catch (error) {
         alert("Backend route needed: DELETE /api/admin/order/:id");
       }
     }
+
+
+    function updateSpeakingBadges(tests) {
+      const count = tests.filter(test => test.status === "pending" || test.status === "checking").length;
+
+      [speakingTestBadge, speakingTestBadge2].forEach(badge => {
+        if (!badge) return;
+        badge.textContent = count;
+        badge.style.display = count > 0 ? "inline-flex" : "none";
+      });
+    }
+
+    function speakingMatchesSearch(test, value) {
+      if (!value) return true;
+
+      const text = [
+        test.full_name,
+        test.user_name,
+        test.phone,
+        test.gmail,
+        test.telegram,
+        test.video_name,
+        test.status,
+        test.result_message,
+        test.created_at
+      ].join(" ").toLowerCase();
+
+      return text.includes(value);
+    }
+
+    function renderSpeakingTests() {
+      const value = (speakingSearchInput.value || "").trim().toLowerCase();
+      const filtered = allSpeakingTests.filter(test => speakingMatchesSearch(test, value));
+
+      if (!filtered.length) {
+        speakingTestsList.innerHTML = `<div class="empty">No speaking tests found.</div>`;
+        updateSpeakingBadges(allSpeakingTests);
+        return;
+      }
+
+      speakingTestsList.innerHTML = filtered.map(test => `
+        <div class="card">
+          <div class="row">
+            <div>
+              <div class="user-name">${test.full_name || test.user_name || "-"}</div>
+              <div class="muted">Account: ${test.user_name || "-"} • ${test.phone || "-"}</div>
+            </div>
+            <div>
+              <div class="muted">Video: ${test.video_name || "-"}</div>
+              <div class="status ${getStatusClass(test.status)}">${getStatusText(test.status)}</div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="muted">Gmail: ${test.gmail || "-"}</div>
+            <div class="muted">Telegram: ${test.telegram || "-"}</div>
+          </div>
+
+          <div class="muted">Submitted: ${new Date(test.created_at).toLocaleString()}</div>
+
+          <audio class="audio-player" controls src="${API_URL}${test.audio_url}"></audio>
+
+          <textarea class="result-input" id="speaking-result-${test.id}" placeholder="Example: Your speaking score is 6.0. Work on fluency and pronunciation.">${test.result_message || ""}</textarea>
+
+          <div class="actions">
+            <button class="small-btn info-btn" onclick="updateSpeakingTest(${test.id}, 'checking')">Mark Checking</button>
+            <button class="small-btn approve-btn" onclick="updateSpeakingTest(${test.id}, 'completed')">Send Result</button>
+            <button class="small-btn decline-btn" onclick="updateSpeakingTest(${test.id}, 'declined')">Decline</button>
+            <button class="small-btn delete-btn" onclick="deleteSpeakingTest(${test.id})">Delete</button>
+          </div>
+        </div>
+      `).join("");
+
+      updateSpeakingBadges(allSpeakingTests);
+    }
+
+    async function loadSpeakingTests() {
+      try {
+        const response = await fetch(`${API_URL}/api/admin/speaking-tests`, {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          speakingTestsList.innerHTML = `<div class="empty">${data.message || "Failed to load speaking tests"}</div>`;
+          return;
+        }
+
+        allSpeakingTests = data;
+        renderSpeakingTests();
+      } catch (error) {
+        speakingTestsList.innerHTML = `<div class="empty">Backend route needed: /api/admin/speaking-tests</div>`;
+      }
+    }
+
+    async function updateSpeakingTest(testId, status) {
+      const result_message = document.getElementById(`speaking-result-${testId}`).value.trim();
+
+      try {
+        const response = await fetch(`${API_URL}/api/admin/speaking-test/${testId}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify({ status, result_message })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          alert(data.message || "Failed to update speaking test.");
+          return;
+        }
+
+        alert(data.message || "Speaking test updated.");
+        loadSpeakingTests();
+      } catch (error) {
+        alert("Backend route needed: /api/admin/speaking-test/:id");
+      }
+    }
+
+    async function deleteSpeakingTest(testId) {
+      const ok = confirm("Delete this speaking test and its audio?");
+      if (!ok) return;
+
+      try {
+        const response = await fetch(`${API_URL}/api/admin/speaking-test/${testId}`, {
+          method: "DELETE",
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          alert(data.message || "Failed to delete speaking test.");
+          return;
+        }
+
+        alert(data.message || "Speaking test deleted.");
+        loadSpeakingTests();
+      } catch (error) {
+        alert("Backend route needed: DELETE /api/admin/speaking-test/:id");
+      }
+    }
+
 
     async function loadDeposits() {
       try {
@@ -911,12 +1123,15 @@
     });
 
     ordersSearchInput.addEventListener("input", renderOrders);
+    speakingSearchInput.addEventListener("input", renderSpeakingTests);
 
     loadUsers();
     loadDeposits();
     loadOrders();
+    loadSpeakingTests();
 
     setInterval(loadOrders, 30000);
+    setInterval(loadSpeakingTests, 30000);
   </script>
 </body>
 </html>
