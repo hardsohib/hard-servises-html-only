@@ -649,7 +649,16 @@
       userNotificationBadge.textContent = unreadOrderCount;
       userNotificationBadge.style.display = unreadOrderCount > 0 ? "inline-flex" : "none";
     }
+function updateUserBadge(orders) {
+  const unread = orders.filter(o => o.is_read === 0).length;
 
+  const badge = document.getElementById("userNotificationBadge");
+
+  if (!badge) return;
+
+  badge.textContent = unread;
+  badge.style.display = unread > 0 ? "inline-flex" : "none";
+}
     async function openNotifications() {
       try {
         await fetch(`${API_URL}/api/services/my-orders/read`, {
