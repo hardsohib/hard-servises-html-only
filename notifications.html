@@ -29,6 +29,7 @@
       <div class="title">Notifications</div>
       <button class="btn" onclick="window.location.href='services.html'">Back</button>
     </div>
+
     <div class="list" id="notificationsList">
       <div class="card">Loading notifications...</div>
     </div>
@@ -57,24 +58,34 @@
 
     async function loadNotifications() {
       try {
-        const response = await fetch(`${API_URL}/api/services/my-orders`, {
+        list.innerHTML = `<div class="card">Loading notifications...</div>`;
+
+        const ordersRes = await fetch(`${API_URL}/api/services/my-orders`, {
           headers: { "Authorization": `Bearer ${token}` }
         });
-        const data = await response.json();
 
-        if (!response.ok) {
-          list.innerHTML = `<div class="card">${data.message || "Failed to load notifications."}</div>`;
+        const orders = await ordersRes.json();
+
+        if (!ordersRes.ok) {
+          list.innerHTML = `<div class="card">${orders.message || "Failed to load orders."}</div>`;
           return;
         }
 
-        if (!data.length) {
-          list.innerHTML = `<div class="card">No notifications yet.</div>`;
-          return;
+        let speakingTests = [];
+
+        try {
+          const speakingRes = await fetch(`${API_URL}/api/speaking-tests/my`, {
+            headers: { "Authorization": `Bearer ${token}` }
+          });
+
+          if (speakingRes.ok) {
+            speakingTests = await speakingRes.json();
+          }
+        } catch (e) {
+          console.log("Speaking fetch error", e);
         }
-fetch(`${API_URL}/api/speaking-tests/my`, {
-  headers: { "Authorization": `Bearer ${token}` }
-})
-        list.innerHTML = data.map(order => `
+
+        const orderCards = orders.map(order => `
           <div class="card">
             <div class="row">
               <div>
@@ -85,9 +96,32 @@ fetch(`${API_URL}/api/speaking-tests/my`, {
             </div>
             <div class="muted">${order.admin_message || "No admin message yet."}</div>
           </div>
-        `).join("");
+        `);
+
+        const speakingCards = speakingTests.map(test => `
+          <div class="card">
+            <div class="row">
+              <div>
+                <div class="name">Speaking Test</div>
+           
+              </div>
+              <div class="status ${statusClass(test.status)}">${statusText(test.status)}</div>
+            </div>
+            <div class="muted">${test.result_message || "Waiting for admin..."}</div>
+          </div>
+        `);
+
+        const allCards = [...speakingCards, ...orderCards];
+
+        if (!allCards.length) {
+          list.innerHTML = `<div class="card">No notifications yet.</div>`;
+          return;
+        }
+
+        list.innerHTML = allCards.join("");
       } catch (error) {
-        list.innerHTML = `<div class="card">Backend route needed: /api/services/my-orders</div>`;
+        console.log(error);
+        list.innerHTML = `<div class="card">Failed to load notifications.</div>`;
       }
     }
 
