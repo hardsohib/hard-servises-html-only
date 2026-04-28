@@ -26,9 +26,9 @@
     .test-layout{width:100%;min-height:100vh;display:grid;grid-template-columns:minmax(0,1.45fr) minmax(320px,.55fr);gap:18px;padding:18px}
     .video-panel,.record-panel{border-radius:24px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);overflow:hidden;min-height:calc(100vh - 36px)}
     .video-wrap{width:100%;height:100%;position:relative;background:#020617}
-    video{width:100%;height:100%;object-fit:contain;display:block;pointer-events:none;user-select:none}
+    #youtubePlayer{width:100%;height:100%;display:block}
     .video-shield{position:absolute;inset:0;z-index:5;cursor:not-allowed}
-    .video-label{position:absolute;top:16px;left:16px;z-index:6;padding:8px 12px;border-radius:999px;background:rgba(15,23,42,.72);border:1px solid rgba(255,255,255,.12);font-size:13px;font-weight:bold}
+    .video-label{position:absolute;top:16px;left:16px;z-index:6;padding:8px 12px;border-radius:999px;background:rgba(15,23,42,.72);border:1px solid rgba(255,255,255,.12);font-size:13px;font-weight:bold;max-width:90%;word-break:break-all}
     .record-panel{padding:24px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center}
     .mic{width:120px;height:120px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#ef4444,#9333ea);box-shadow:0 0 45px rgba(239,68,68,.35);font-size:54px;margin-bottom:18px;animation:pulse 1.4s infinite}
     @keyframes pulse{0%,100%{transform:scale(1);box-shadow:0 0 35px rgba(239,68,68,.28)}50%{transform:scale(1.05);box-shadow:0 0 55px rgba(239,68,68,.48)}}
@@ -48,7 +48,7 @@
       <p>Enter your full name. Then rotate your phone horizontally and allow microphone access.</p>
       <label for="fullName">Full Name</label>
       <input id="fullName" type="text" placeholder="Enter your full name" autocomplete="name" />
-      <div class="warning">Video controls are disabled. Audio records automatically until the video ends.</div>
+      <div class="warning">A random YouTube video will be selected. Audio records automatically until the video ends.</div>
       <button class="btn" onclick="startPermissionStep()">Continue</button>
       <button class="btn secondary" onclick="window.location.href='services.html'">Back to Services</button>
     </div>
@@ -77,10 +77,11 @@
       <div class="video-panel">
         <div class="video-wrap">
           <div class="video-label" id="videoLabel">Speaking Test Video</div>
-          <video id="testVideo" playsinline></video>
+          <div id="youtubePlayer"></div>
           <div class="video-shield" oncontextmenu="return false;"></div>
         </div>
       </div>
+
       <div class="record-panel">
         <div class="mic">🎙️</div>
         <div class="record-title">Recording...</div>
@@ -101,9 +102,49 @@
     </div>
   </section>
 
+  <script src="https://www.youtube.com/iframe_api"></script>
+
   <script>
     const API_URL = "https://hard-service-buy-sell.onrender.com";
-    const videoFiles = ["videos/video1.mp4", "videos/video2.mp4", "videos/video3.mp4"];
+
+    const youtubeLinks = [
+      "https://youtu.be/yp7iFGz19PY",
+      "https://youtu.be/6KlkrcVosXs",
+      "https://youtu.be/vZjpxI7uqR0",
+      "https://youtu.be/wvRqM6nbGHo",
+      "https://youtu.be/cbc2h_f61eg",
+      "https://youtu.be/h1c6YJ8Uqrs",
+      "https://youtu.be/MXvIRTi1fng",
+      "https://youtu.be/hizgT9Abpa4",
+      "https://youtu.be/_nAo5bRlrBM",
+      "https://youtu.be/4sydmi7cklc",
+      "https://youtu.be/b1OahnBi8pw",
+      "https://youtu.be/VAXESr6Lbd4",
+      "https://youtu.be/-mYsdoMJHe4",
+      "https://youtu.be/Vee96Dsol_w",
+      "https://youtu.be/CY60nXh2hUM",
+      "https://youtu.be/mC60pYN-MC8",
+      "https://youtu.be/zAlRHkGedrw",
+      "https://youtu.be/z85PVqoZGPY",
+      "https://youtu.be/SBczkaWsmdc",
+      "https://youtu.be/UbB9PwggxSo",
+      "https://youtu.be/dx_27o-1DyI",
+      "https://youtu.be/TCaVKECkg_4",
+      "https://youtu.be/fH7KhHXEI1g",
+      "https://youtu.be/fazt00Uh18Y",
+      "https://youtu.be/0rn8m5YfWBs",
+      "https://youtu.be/8aEsgpN-9Gg",
+      "https://youtu.be/yc5ns6lVWAk",
+      "https://youtu.be/eN0GlSNnv8s",
+      "https://youtu.be/NkNuhYU4XHk",
+      "https://youtu.be/j0RoVdHEusY",
+      "https://youtu.be/9x0wnxwC_Ds",
+      "https://youtu.be/iH6mT3AetDQ",
+      "https://youtu.be/VCs6nVz8q7g",
+      "https://youtu.be/Na5ps2saQ64",
+      "https://youtu.be/fm1xviXEM4Q",
+      "https://youtu.be/YkVN2eJYe0g"
+    ];
 
     const token = localStorage.getItem("token") || "";
     const savedUser = JSON.parse(localStorage.getItem("user") || "{}");
@@ -115,7 +156,6 @@
     const doneScreen = document.getElementById("doneScreen");
     const fullNameInput = document.getElementById("fullName");
     const permissionMessage = document.getElementById("permissionMessage");
-    const testVideo = document.getElementById("testVideo");
     const videoLabel = document.getElementById("videoLabel");
     const timerEl = document.getElementById("timer");
     const waveCanvas = document.getElementById("waveCanvas");
@@ -124,7 +164,11 @@
     const doneMessage = document.getElementById("doneMessage");
 
     let userFullName = "";
-    let selectedVideoName = "";
+    let selectedYoutubeLink = "";
+    let selectedYoutubeId = "";
+    let player = null;
+    let youtubeReady = false;
+
     let microphoneStream = null;
     let mediaRecorder = null;
     let audioChunks = [];
@@ -133,6 +177,8 @@
     let animationId = null;
     let timerInterval = null;
     let startTime = null;
+    let recordingStarted = false;
+    let finished = false;
 
     if (!token) {
       alert("Please login first.");
@@ -143,6 +189,16 @@
       fullNameInput.value = savedUser.name;
     }
 
+    function onYouTubeIframeAPIReady() {
+      youtubeReady = true;
+    }
+
+    function getYoutubeId(url) {
+      const clean = url.trim();
+      const match = clean.match(/(?:youtu\.be\/|v=)([a-zA-Z0-9_-]{11})/);
+      return match ? match[1] : "";
+    }
+
     function showScreen(screen) {
       [loginScreen, permissionScreen, rotateScreen, testScreen, doneScreen].forEach(s => s.classList.remove("active"));
       screen.classList.add("active");
@@ -150,10 +206,12 @@
 
     function startPermissionStep() {
       const name = fullNameInput.value.trim();
+
       if (name.length < 3) {
         alert("Please enter your full name.");
         return;
       }
+
       userFullName = name;
       localStorage.setItem("speakingTestFullName", userFullName);
       showScreen(permissionScreen);
@@ -180,41 +238,64 @@
         showScreen(rotateScreen);
         return;
       }
+
       startTest();
     }
 
-    async function startTest() {
+    function startTest() {
       if (!microphoneStream) {
         showScreen(permissionScreen);
         return;
       }
 
-      showScreen(testScreen);
-
-      const randomVideo = videoFiles[Math.floor(Math.random() * videoFiles.length)];
-      selectedVideoName = randomVideo.split("/").pop();
-      videoLabel.textContent = `Video: ${selectedVideoName}`;
-
-      testVideo.src = randomVideo;
-      testVideo.controls = false;
-      testVideo.disablePictureInPicture = true;
-      testVideo.controlsList = "nodownload nofullscreen noremoteplayback";
-
-      setupWaveform();
-      startRecording();
-
-      try {
-        await testVideo.play();
-      } catch (error) {
-        alert("Tap OK to start the test video.");
-        await testVideo.play();
+      if (!youtubeReady || !window.YT || !window.YT.Player) {
+        alert("YouTube player is loading. Please try again in 2 seconds.");
+        return;
       }
 
-      testVideo.addEventListener("pause", () => {
-        if (!testVideo.ended) testVideo.play();
-      });
+      showScreen(testScreen);
 
-      testVideo.addEventListener("ended", finishTest, { once: true });
+      selectedYoutubeLink = youtubeLinks[Math.floor(Math.random() * youtubeLinks.length)];
+      selectedYoutubeId = getYoutubeId(selectedYoutubeLink);
+      videoLabel.textContent = selectedYoutubeLink;
+
+      player = new YT.Player("youtubePlayer", {
+        videoId: selectedYoutubeId,
+        width: "100%",
+        height: "100%",
+        playerVars: {
+          autoplay: 1,
+          controls: 0,
+          disablekb: 1,
+          fs: 0,
+          modestbranding: 1,
+          rel: 0,
+          playsinline: 1,
+          iv_load_policy: 3
+        },
+        events: {
+          onReady: function(event) {
+            event.target.playVideo();
+          },
+          onStateChange: onPlayerStateChange
+        }
+      });
+    }
+
+    function onPlayerStateChange(event) {
+      if (event.data === YT.PlayerState.PLAYING && !recordingStarted) {
+        recordingStarted = true;
+        setupWaveform();
+        startRecording();
+      }
+
+      if (event.data === YT.PlayerState.PAUSED && !finished) {
+        player.playVideo();
+      }
+
+      if (event.data === YT.PlayerState.ENDED && !finished) {
+        finishTest();
+      }
     }
 
     function setupWaveform() {
@@ -233,6 +314,7 @@
       function draw() {
         animationId = requestAnimationFrame(draw);
         analyser.getByteTimeDomainData(dataArray);
+
         canvasCtx.clearRect(0, 0, waveCanvas.width, waveCanvas.height);
         canvasCtx.lineWidth = 3;
         canvasCtx.strokeStyle = "#60a5fa";
@@ -244,14 +326,17 @@
         for (let i = 0; i < bufferLength; i++) {
           const v = dataArray[i] / 128.0;
           const y = v * waveCanvas.height / 2;
+
           if (i === 0) canvasCtx.moveTo(x, y);
           else canvasCtx.lineTo(x, y);
+
           x += sliceWidth;
         }
 
         canvasCtx.lineTo(waveCanvas.width, waveCanvas.height / 2);
         canvasCtx.stroke();
       }
+
       draw();
     }
 
@@ -274,6 +359,7 @@
 
     function startTimer() {
       startTime = Date.now();
+
       timerInterval = setInterval(() => {
         const seconds = Math.floor((Date.now() - startTime) / 1000);
         const min = String(Math.floor(seconds / 60)).padStart(2, "0");
@@ -283,8 +369,10 @@
     }
 
     function finishTest() {
+      finished = true;
       showScreen(doneScreen);
 
+      if (player && player.stopVideo) player.stopVideo();
       if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
       if (microphoneStream) microphoneStream.getTracks().forEach(track => track.stop());
       if (animationId) cancelAnimationFrame(animationId);
@@ -297,7 +385,7 @@
         const formData = new FormData();
         formData.append("audio", audioBlob, "speaking-test.webm");
         formData.append("full_name", userFullName);
-        formData.append("video_name", selectedVideoName);
+        formData.append("video_name", selectedYoutubeLink);
 
         const response = await fetch(`${API_URL}/api/speaking-tests`, {
           method: "POST",
