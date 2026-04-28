@@ -71,7 +71,9 @@
           list.innerHTML = `<div class="card">No notifications yet.</div>`;
           return;
         }
-
+fetch(`${API_URL}/api/speaking-tests/my`, {
+  headers: { "Authorization": `Bearer ${token}` }
+})
         list.innerHTML = data.map(order => `
           <div class="card">
             <div class="row">
