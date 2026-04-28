@@ -374,7 +374,9 @@
         uploadStatus.className = "warning error";
       }
     }
-
+fetch(`${API_URL}/api/speaking-tests/my`, {
+  headers: { "Authorization": `Bearer ${token}` }
+})
     window.addEventListener("orientationchange", () => {
       if (rotateScreen.classList.contains("active")) setTimeout(checkOrientationAndStart, 500);
     });
