@@ -352,6 +352,11 @@
       border: 1px solid rgba(0,0,0,0.08);
     }
 
+
+    .writing-preview{padding:12px;border-radius:12px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);margin:10px 0;line-height:1.5;white-space:pre-wrap;max-height:160px;overflow:auto}
+    body.light .writing-preview{background:white;border:1px solid rgba(0,0,0,0.08)}
+    .image-links{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.image-links a{color:#93c5fd;font-weight:bold;font-size:13px}.writing-section-name{font-weight:bold;margin-top:12px;margin-bottom:6px;color:#93c5fd}
+
     .theme-btn {
       position: fixed;
       right: 20px;
@@ -390,6 +395,10 @@
     <div class="topbar">
       <div class="title">Admin Panel</div>
       <div class="top-actions">
+        <div class="badge-wrap">
+          <button class="btn" onclick="document.getElementById('writingTestsSection').scrollIntoView({behavior:'smooth'})">Writing Tests</button>
+          <span class="badge" id="writingTestBadge">0</span>
+        </div>
         <div class="badge-wrap">
           <button class="btn" onclick="document.getElementById('speakingTestsSection').scrollIntoView({behavior:'smooth'})">Speaking Tests</button>
           <span class="badge" id="speakingTestBadge">0</span>
@@ -479,6 +488,13 @@
     </div>
 
 
+
+    <div class="section" id="writingTestsSection">
+      <div class="orders-header"><div class="section-title">Writing Test Submissions</div><div class="badge-wrap"><button class="btn" onclick="loadWritingTests()">Refresh Writing</button><span class="badge" id="writingTestBadge2">0</span></div></div>
+      <input type="text" id="writingSearchInput" class="orders-search" placeholder="Search writing tests by name, phone, status, or result" />
+      <div class="list" id="writingTestsList"><div class="empty">Loading writing tests...</div></div>
+    </div>
+
     <div class="section">
       <div class="section-title">Deposits</div>
       <div class="list" id="depositsList">
@@ -511,10 +527,15 @@
     const speakingSearchInput = document.getElementById("speakingSearchInput");
     const speakingTestBadge = document.getElementById("speakingTestBadge");
     const speakingTestBadge2 = document.getElementById("speakingTestBadge2");
+    const writingTestsList = document.getElementById("writingTestsList");
+    const writingSearchInput = document.getElementById("writingSearchInput");
+    const writingTestBadge = document.getElementById("writingTestBadge");
+    const writingTestBadge2 = document.getElementById("writingTestBadge2");
 
     let allUsers = [];
     let allOrders = [];
     let allSpeakingTests = [];
+    let allWritingTests = [];
 
     if (!token) {
       window.location.href = "index.html";
@@ -748,6 +769,7 @@
         alert(data.message || "Order updated.");
         loadOrders();
     loadSpeakingTests();
+    loadWritingTests();
       } catch (error) {
         alert("Backend route needed: /api/admin/order/:id");
       }
@@ -924,6 +946,15 @@
       }
     }
 
+
+
+    function updateWritingBadges(tests){const count=tests.filter(t=>t.status==="pending"||t.status==="checking").length;[writingTestBadge,writingTestBadge2].forEach(b=>{if(!b)return;b.textContent=count;b.style.display=count>0?"inline-flex":"none"})}
+    function imgLinks(jsonText){let files=[];try{files=JSON.parse(jsonText||"[]")}catch{files=[]}if(!files.length)return `<div class="muted">No photos uploaded</div>`;return `<div class="image-links">${files.map((url,i)=>`<a href="${API_URL}${url}" target="_blank">Photo ${i+1}</a>`).join("")}</div>`}
+    function writingBlock(title,qText,qFiles,aText,aFiles){return `<div class="writing-section-name">${title}</div><div class="muted">Question text:</div><div class="writing-preview">${qText||"No typed question"}</div>${imgLinks(qFiles)}<div class="muted">Answer text:</div><div class="writing-preview">${aText||"No typed answer"}</div>${imgLinks(aFiles)}`}
+    function renderWritingTests(){const v=(writingSearchInput.value||"").trim().toLowerCase();const filtered=allWritingTests.filter(t=>[t.full_name,t.user_name,t.phone,t.gmail,t.telegram,t.status,t.result_message,t.formal_letter_question_text,t.formal_letter_answer_text,t.informal_letter_question_text,t.informal_letter_answer_text,t.essay_question_text,t.essay_answer_text].join(" ").toLowerCase().includes(v));if(!filtered.length){writingTestsList.innerHTML=`<div class="empty">No writing tests found.</div>`;updateWritingBadges(allWritingTests);return}writingTestsList.innerHTML=filtered.map(test=>`<div class="card"><div class="row"><div><div class="user-name">${test.full_name||test.user_name||"-"}</div><div class="muted">Account: ${test.user_name||"-"} • ${test.phone||"-"}</div></div><div><div class="muted">Submitted: ${new Date(test.created_at).toLocaleString()}</div><div class="status ${getStatusClass(test.status)}">${getStatusText(test.status)}</div></div></div><div class="row"><div class="muted">Gmail: ${test.gmail||"-"}</div><div class="muted">Telegram: ${test.telegram||"-"}</div></div>${writingBlock("Formal Letter",test.formal_letter_question_text,test.formal_letter_question_files,test.formal_letter_answer_text,test.formal_letter_answer_files)}${writingBlock("Informal Letter",test.informal_letter_question_text,test.informal_letter_question_files,test.informal_letter_answer_text,test.informal_letter_answer_files)}${writingBlock("Essay",test.essay_question_text,test.essay_question_files,test.essay_answer_text,test.essay_answer_files)}<textarea class="result-input" id="writing-result-${test.id}" placeholder="Example: Your writing score is 6.5.">${test.result_message||""}</textarea><div class="actions"><button class="small-btn info-btn" onclick="updateWritingTest(${test.id}, 'checking')">Mark Checking</button><button class="small-btn approve-btn" onclick="updateWritingTest(${test.id}, 'completed')">Send Result</button><button class="small-btn decline-btn" onclick="updateWritingTest(${test.id}, 'declined')">Decline</button><button class="small-btn delete-btn" onclick="deleteWritingTest(${test.id})">Delete</button></div></div>`).join("");updateWritingBadges(allWritingTests)}
+    async function loadWritingTests(){try{const response=await fetch(`${API_URL}/api/admin/writing-tests`,{headers:{"Authorization":`Bearer ${token}`}});const data=await response.json();if(!response.ok){writingTestsList.innerHTML=`<div class="empty">${data.message||"Failed to load writing tests"}</div>`;return}allWritingTests=data;renderWritingTests()}catch(error){writingTestsList.innerHTML=`<div class="empty">Backend route needed: /api/admin/writing-tests</div>`}}
+    async function updateWritingTest(testId,status){const result_message=document.getElementById(`writing-result-${testId}`).value.trim();try{const response=await fetch(`${API_URL}/api/admin/writing-test/${testId}`,{method:"PUT",headers:{"Content-Type":"application/json","Authorization":`Bearer ${token}`},body:JSON.stringify({status,result_message})});const data=await response.json();if(!response.ok){alert(data.message||"Failed to update writing test.");return}alert(data.message||"Writing test updated.");loadWritingTests();loadOrders()}catch(error){alert("Backend route needed: /api/admin/writing-test/:id")}}
+    async function deleteWritingTest(testId){if(!confirm("Delete this writing test and its photos?"))return;try{const response=await fetch(`${API_URL}/api/admin/writing-test/${testId}`,{method:"DELETE",headers:{"Authorization":`Bearer ${token}`}});const data=await response.json();if(!response.ok){alert(data.message||"Failed to delete writing test.");return}alert(data.message||"Writing test deleted.");loadWritingTests()}catch(error){alert("Backend route needed: DELETE /api/admin/writing-test/:id")}}
 
     async function loadDeposits() {
       try {
@@ -1124,6 +1155,7 @@
 
     ordersSearchInput.addEventListener("input", renderOrders);
     speakingSearchInput.addEventListener("input", renderSpeakingTests);
+    writingSearchInput.addEventListener("input", renderWritingTests);
 
     loadUsers();
     loadDeposits();
@@ -1132,6 +1164,7 @@
 
     setInterval(loadOrders, 30000);
     setInterval(loadSpeakingTests, 30000);
+    setInterval(loadWritingTests, 30000);
   </script>
 </body>
 </html>
