@@ -23,7 +23,7 @@
     <div class="topbar"><div><h1>Writing Test</h1><p class="intro">Submit Formal Letter, Informal Letter, and Essay. You can type text or upload photos.</p></div><button class="btn secondary" onclick="window.location.href='services.html'">Back</button></div>
     <div class="warning">Photo limits: question image = max 1 per section. Answer images = max 5 per section.</div>
     <div id="sections"></div>
-    <div class="card"><div class="actions"><button class="btn" onclick="submitWritingTest()">Submit Writing Test</button><button class="btn secondary" onclick="clearDraft()">Clear Draft</button></div><div id="statusBox" class="warning" style="display:none;margin-top:16px;"></div></div>
+    <div class="card"><div class="actions"<button class="btn" onclick="confirmSubmitWritingTest()">Submit Writing Test</button><button class="btn secondary" onclick="clearDraft()">Clear Draft</button></div><div id="statusBox" class="warning" style="display:none;margin-top:16px;"></div></div>
   </div>
   <script>
     const API_URL = "https://hard-service-buy-sell.onrender.com";
@@ -38,6 +38,11 @@
     writingSections.forEach(section=>{const qText=document.getElementById(`${section.key}_question_text`),aText=document.getElementById(`${section.key}_answer_text`),qWords=document.getElementById(`${section.key}_question_words`),aWords=document.getElementById(`${section.key}_answer_words`),qFile=document.getElementById(`${section.key}_question_file`),aFiles=document.getElementById(`${section.key}_answer_files`),qFileName=document.getElementById(`${section.key}_question_file_name`),aFileNames=document.getElementById(`${section.key}_answer_file_names`);qText.addEventListener("input",()=>{qWords.textContent=countWords(qText.value);saveDraft()});aText.addEventListener("input",()=>{aWords.textContent=countWords(aText.value);saveDraft()});qFile.addEventListener("change",()=>{qFileName.textContent=qFile.files[0]?qFile.files[0].name:"No photo selected"});aFiles.addEventListener("change",()=>{if(aFiles.files.length>5){alert("You can upload maximum 5 answer photos.");aFiles.value="";aFileNames.textContent="No photos selected";return}aFileNames.textContent=aFiles.files.length?Array.from(aFiles.files).map(file=>file.name).join(", "):"No photos selected"})});
     function getDraftData(){const data={};writingSections.forEach(section=>{data[`${section.key}_question_text`]=document.getElementById(`${section.key}_question_text`).value;data[`${section.key}_answer_text`]=document.getElementById(`${section.key}_answer_text`).value});return data}
     function saveDraft(){localStorage.setItem("writingTestDraft",JSON.stringify(getDraftData()))}
+    function confirmSubmitWritingTest() {
+  const yes = confirm("Are you sure you want to submit your writing test?");
+  if (!yes) return;
+  submitWritingTest();
+}
     function loadDraft(){const draft=JSON.parse(localStorage.getItem("writingTestDraft")||"{}");writingSections.forEach(section=>{const q=document.getElementById(`${section.key}_question_text`),a=document.getElementById(`${section.key}_answer_text`);q.value=draft[`${section.key}_question_text`]||"";a.value=draft[`${section.key}_answer_text`]||"";document.getElementById(`${section.key}_question_words`).textContent=countWords(q.value);document.getElementById(`${section.key}_answer_words`).textContent=countWords(a.value)})}
     function clearDraft(){if(!confirm("Clear all typed writing draft?"))return;localStorage.removeItem("writingTestDraft");location.reload()}
     function hasAnyContent(){return writingSections.some(section=>document.getElementById(`${section.key}_question_text`).value.trim()||document.getElementById(`${section.key}_answer_text`).value.trim()||document.getElementById(`${section.key}_question_file`).files.length||document.getElementById(`${section.key}_answer_files`).files.length)}
