@@ -357,6 +357,45 @@
     body.light .writing-preview{background:white;border:1px solid rgba(0,0,0,0.08)}
     .image-links{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.image-links a{color:#93c5fd;font-weight:bold;font-size:13px}.writing-section-name{font-weight:bold;margin-top:12px;margin-bottom:6px;color:#93c5fd}
 
+
+    .promo-form {
+      display: grid;
+      grid-template-columns: 1fr 180px auto;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .promo-input {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: none;
+      outline: none;
+      font-size: 15px;
+    }
+
+    body:not(.light) .promo-input {
+      background: rgba(255,255,255,0.06);
+      color: white;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    body.light .promo-input {
+      background: white;
+      color: #111;
+      border: 1px solid rgba(0,0,0,0.08);
+    }
+
+    .used-promo {
+      opacity: 0.75;
+    }
+
+    @media (max-width: 800px) {
+      .promo-form {
+        grid-template-columns: 1fr;
+      }
+    }
+
     .theme-btn {
       position: fixed;
       right: 20px;
@@ -395,6 +434,7 @@
     <div class="topbar">
       <div class="title">Admin Panel</div>
       <div class="top-actions">
+        <button class="btn" onclick="document.getElementById('promoCodesSection').scrollIntoView({behavior:'smooth'})">Promo Codes</button>
         <div class="badge-wrap">
           <button class="btn" onclick="document.getElementById('writingTestsSection').scrollIntoView({behavior:'smooth'})">Writing Tests</button>
           <span class="badge" id="writingTestBadge">0</span>
@@ -495,6 +535,24 @@
       <div class="list" id="writingTestsList"><div class="empty">Loading writing tests...</div></div>
     </div>
 
+
+    <div class="section" id="promoCodesSection">
+      <div class="orders-header">
+        <div class="section-title">Promo Codes</div>
+        <button class="btn" onclick="loadPromoCodes()">Refresh Promo Codes</button>
+      </div>
+
+      <div class="promo-form">
+        <input id="promoCodeInput" class="promo-input" placeholder="Promo code, e.g. SOHA5000" />
+        <input id="promoAmountInput" class="promo-input" type="number" min="5000" placeholder="Amount UZS" />
+        <button class="btn" onclick="createPromoCode()">Create</button>
+      </div>
+
+      <div class="list" id="promoCodesList">
+        <div class="empty">Loading promo codes...</div>
+      </div>
+    </div>
+
     <div class="section">
       <div class="section-title">Deposits</div>
       <div class="list" id="depositsList">
@@ -509,6 +567,9 @@
     const API_URL = "https://hard-service-buy-sell.onrender.com";
     const token = localStorage.getItem("token");
     const savedUser = JSON.parse(localStorage.getItem("user") || "{}");
+    const promoCodesList = document.getElementById("promoCodesList");
+    const promoCodeInput = document.getElementById("promoCodeInput");
+    const promoAmountInput = document.getElementById("promoAmountInput");
 
     const usersList = document.getElementById("usersList");
     const depositsList = document.getElementById("depositsList");
@@ -612,6 +673,117 @@
           </div>
         </div>
       `).join("");
+    }
+
+
+    async function loadPromoCodes() {
+      try {
+        const response = await fetch(`${API_URL}/api/admin/promo-codes`, {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          promoCodesList.innerHTML = `<div class="empty">${data.message || "Failed to load promo codes"}</div>`;
+          return;
+        }
+
+        if (!data.length) {
+          promoCodesList.innerHTML = `<div class="empty">No promo codes created yet.</div>`;
+          return;
+        }
+
+        promoCodesList.innerHTML = data.map(promo => `
+          <div class="card ${promo.used_by ? "used-promo" : ""}">
+            <div class="row">
+              <div>
+                <div class="user-name">${promo.code}</div>
+                <div class="muted">Created: ${new Date(promo.created_at).toLocaleString()}</div>
+              </div>
+              <div>
+                <div class="muted">${Number(promo.amount).toLocaleString("en-US")} UZS</div>
+                <div class="status ${promo.used_by ? "completed" : "progress"}">${promo.used_by ? "Used" : "Active"}</div>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="muted">Used by: ${promo.used_by_name || "-"} ${promo.used_by_phone ? "• " + promo.used_by_phone : ""}</div>
+              <div class="muted">Used at: ${promo.used_at ? new Date(promo.used_at).toLocaleString() : "-"}</div>
+            </div>
+
+            <div class="actions">
+              ${promo.used_by ? "" : `<button class="small-btn delete-btn" onclick="deletePromoCode(${promo.id})">Delete</button>`}
+            </div>
+          </div>
+        `).join("");
+      } catch (error) {
+        promoCodesList.innerHTML = `<div class="empty">Server error while loading promo codes.</div>`;
+      }
+    }
+
+    async function createPromoCode() {
+      const code = promoCodeInput.value.trim().toUpperCase();
+      const amount = Number(promoAmountInput.value);
+
+      if (!code) {
+        alert("Enter promo code.");
+        return;
+      }
+
+      if (!amount || amount < 5000) {
+        alert("Promo amount must be at least 5000 UZS.");
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_URL}/api/admin/promo-codes`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify({ code, amount })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          alert(data.message || "Failed to create promo code.");
+          return;
+        }
+
+        alert(`Promo created: ${data.code} = ${Number(data.amount).toLocaleString("en-US")} UZS`);
+        promoCodeInput.value = "";
+        promoAmountInput.value = "";
+        loadPromoCodes();
+      } catch (error) {
+        alert("Server error.");
+      }
+    }
+
+    async function deletePromoCode(id) {
+      const ok = confirm("Delete this promo code?");
+      if (!ok) return;
+
+      try {
+        const response = await fetch(`${API_URL}/api/admin/promo-code/${id}`, {
+          method: "DELETE",
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          alert(data.message || "Failed to delete promo code.");
+          return;
+        }
+
+        alert(data.message || "Promo code deleted.");
+        loadPromoCodes();
+      } catch (error) {
+        alert("Server error.");
+      }
     }
 
     async function loadUsers() {
