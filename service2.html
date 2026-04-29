@@ -23,31 +23,103 @@
     <div class="topbar"><div><h1>Writing Test</h1><p class="intro">Submit Formal Letter, Informal Letter, and Essay. You can type text or upload photos.</p></div><button class="btn secondary" onclick="window.location.href='services.html'">Back</button></div>
     <div class="warning">Photo limits: question image = max 1 per section. Answer images = max 5 per section.</div>
     <div id="sections"></div>
-    <div class="card"><div class="actions"<button class="btn" onclick="confirmSubmitWritingTest()">Submit Writing Test</button><button class="btn secondary" onclick="clearDraft()">Clear Draft</button></div><div id="statusBox" class="warning" style="display:none;margin-top:16px;"></div></div>
+
+    <div class="card">
+      <div class="actions">
+        <!-- ONLY CHANGE -->
+        <button class="btn" onclick="confirmSubmitWritingTest()">Submit Writing Test</button>
+        <button class="btn secondary" onclick="clearDraft()">Clear Draft</button>
+      </div>
+      <div id="statusBox" class="warning" style="display:none;margin-top:16px;"></div>
+    </div>
   </div>
+
   <script>
     const API_URL = "https://hard-service-buy-sell.onrender.com";
     const token = localStorage.getItem("token") || "";
     if (!token) { alert("Please login first."); window.location.href = "index.html"; }
-    const writingSections = [{key:"formal_letter",title:"1. Formal Letter"},{key:"informal_letter",title:"2. Informal Letter"},{key:"essay",title:"3. Essay"}];
-    const sectionsContainer=document.getElementById("sections"),statusBox=document.getElementById("statusBox");
-    function sectionTemplate(item){return `<div class="card"><div class="section-title">${item.title}</div><p class="section-sub">Type the question and answer, or upload photos if you wrote it by hand.</p><div class="grid"><div class="box"><label>Question / Task</label><textarea id="${item.key}_question_text" placeholder="Type the question/task here..."></textarea><input id="${item.key}_question_file" type="file" accept="image/*" /><div class="counter"><span>Words: <b id="${item.key}_question_words">0</b></span><span>Question photo limit: 1</span></div><div class="file-list" id="${item.key}_question_file_name">No photo selected</div></div><div class="box"><label>Answer</label><textarea id="${item.key}_answer_text" placeholder="Write your answer here..."></textarea><input id="${item.key}_answer_files" type="file" accept="image/*" multiple /><div class="counter"><span>Words: <b id="${item.key}_answer_words">0</b></span><span>Answer photo limit: 5</span></div><div class="file-list" id="${item.key}_answer_file_names">No photos selected</div></div></div></div>`}
+
+    const writingSections = [
+      {key:"formal_letter",title:"1. Formal Letter"},
+      {key:"informal_letter",title:"2. Informal Letter"},
+      {key:"essay",title:"3. Essay"}
+    ];
+
+    const sectionsContainer=document.getElementById("sections"),
+          statusBox=document.getElementById("statusBox");
+
+    function sectionTemplate(item){return `<div class="card"><div class="section-title">${item.title}</div><p class="section-sub">Type the question and answer, or upload photos if you wrote it by hand.</p><div class="grid"><div class="box"><label>Question / Task</label><textarea id="${item.key}_question_text"></textarea><input id="${item.key}_question_file" type="file" accept="image/*" /><div class="counter"><span>Words: <b id="${item.key}_question_words">0</b></span></div></div><div class="box"><label>Answer</label><textarea id="${item.key}_answer_text"></textarea><input id="${item.key}_answer_files" type="file" accept="image/*" multiple /><div class="counter"><span>Words: <b id="${item.key}_answer_words">0</b></span></div></div></div></div>`}
+
     sectionsContainer.innerHTML=writingSections.map(sectionTemplate).join("");
+
     function countWords(text){return text.trim().split(/\s+/).filter(Boolean).length}
-    function showStatus(message,type="warning"){statusBox.style.display="block";statusBox.className=`warning ${type}`;statusBox.textContent=message}
-    writingSections.forEach(section=>{const qText=document.getElementById(`${section.key}_question_text`),aText=document.getElementById(`${section.key}_answer_text`),qWords=document.getElementById(`${section.key}_question_words`),aWords=document.getElementById(`${section.key}_answer_words`),qFile=document.getElementById(`${section.key}_question_file`),aFiles=document.getElementById(`${section.key}_answer_files`),qFileName=document.getElementById(`${section.key}_question_file_name`),aFileNames=document.getElementById(`${section.key}_answer_file_names`);qText.addEventListener("input",()=>{qWords.textContent=countWords(qText.value);saveDraft()});aText.addEventListener("input",()=>{aWords.textContent=countWords(aText.value);saveDraft()});qFile.addEventListener("change",()=>{qFileName.textContent=qFile.files[0]?qFile.files[0].name:"No photo selected"});aFiles.addEventListener("change",()=>{if(aFiles.files.length>5){alert("You can upload maximum 5 answer photos.");aFiles.value="";aFileNames.textContent="No photos selected";return}aFileNames.textContent=aFiles.files.length?Array.from(aFiles.files).map(file=>file.name).join(", "):"No photos selected"})});
-    function getDraftData(){const data={};writingSections.forEach(section=>{data[`${section.key}_question_text`]=document.getElementById(`${section.key}_question_text`).value;data[`${section.key}_answer_text`]=document.getElementById(`${section.key}_answer_text`).value});return data}
-    function saveDraft(){localStorage.setItem("writingTestDraft",JSON.stringify(getDraftData()))}
+
+    function showStatus(message,type="warning"){
+      statusBox.style.display="block";
+      statusBox.className=`warning ${type}`;
+      statusBox.textContent=message;
+    }
+
+    // 🔥 ADDED CONFIRM FUNCTION
     function confirmSubmitWritingTest() {
-  const yes = confirm("Are you sure you want to submit your writing test?");
-  if (!yes) return;
-  submitWritingTest();
-}
-    function loadDraft(){const draft=JSON.parse(localStorage.getItem("writingTestDraft")||"{}");writingSections.forEach(section=>{const q=document.getElementById(`${section.key}_question_text`),a=document.getElementById(`${section.key}_answer_text`);q.value=draft[`${section.key}_question_text`]||"";a.value=draft[`${section.key}_answer_text`]||"";document.getElementById(`${section.key}_question_words`).textContent=countWords(q.value);document.getElementById(`${section.key}_answer_words`).textContent=countWords(a.value)})}
-    function clearDraft(){if(!confirm("Clear all typed writing draft?"))return;localStorage.removeItem("writingTestDraft");location.reload()}
-    function hasAnyContent(){return writingSections.some(section=>document.getElementById(`${section.key}_question_text`).value.trim()||document.getElementById(`${section.key}_answer_text`).value.trim()||document.getElementById(`${section.key}_question_file`).files.length||document.getElementById(`${section.key}_answer_files`).files.length)}
-    async function submitWritingTest(){if(!hasAnyContent()){showStatus("Please write or upload at least one section before submitting.","error");return}const formData=new FormData();writingSections.forEach(section=>{formData.append(`${section.key}_question_text`,document.getElementById(`${section.key}_question_text`).value.trim());formData.append(`${section.key}_answer_text`,document.getElementById(`${section.key}_answer_text`).value.trim());const qFile=document.getElementById(`${section.key}_question_file`).files[0];if(qFile)formData.append(`${section.key}_question_file`,qFile);Array.from(document.getElementById(`${section.key}_answer_files`).files).slice(0,5).forEach(file=>formData.append(`${section.key}_answer_files`,file))});try{showStatus("Uploading writing test... please wait.");const response=await fetch(`${API_URL}/api/writing-tests`,{method:"POST",headers:{Authorization:`Bearer ${token}`},body:formData});const data=await response.json();if(!response.ok)throw new Error(data.message||"Upload failed.");localStorage.removeItem("writingTestDraft");showStatus("Writing test submitted successfully. Your result will be checked in 48 hours.","ok");setTimeout(()=>window.location.href="services.html",1800)}catch(error){showStatus("Upload failed: "+error.message,"error")}}
-    loadDraft();
+      const ok = confirm("Are you sure you want to submit your writing test?");
+      if (!ok) return;
+      submitWritingTest();
+    }
+
+    function hasAnyContent(){
+      return writingSections.some(section =>
+        document.getElementById(`${section.key}_question_text`).value.trim() ||
+        document.getElementById(`${section.key}_answer_text`).value.trim() ||
+        document.getElementById(`${section.key}_question_file`).files.length ||
+        document.getElementById(`${section.key}_answer_files`).files.length
+      );
+    }
+
+    async function submitWritingTest(){
+      if(!hasAnyContent()){
+        showStatus("Please write something first","error");
+        return;
+      }
+
+      const formData=new FormData();
+
+      writingSections.forEach(section=>{
+        formData.append(`${section.key}_question_text`,document.getElementById(`${section.key}_question_text`).value);
+        formData.append(`${section.key}_answer_text`,document.getElementById(`${section.key}_answer_text`).value);
+
+        const qFile=document.getElementById(`${section.key}_question_file`).files[0];
+        if(qFile)formData.append(`${section.key}_question_file`,qFile);
+
+        Array.from(document.getElementById(`${section.key}_answer_files`).files)
+          .slice(0,5)
+          .forEach(file=>formData.append(`${section.key}_answer_files`,file));
+      });
+
+      try{
+        showStatus("Uploading...");
+        const res=await fetch(`${API_URL}/api/writing-tests`,{
+          method:"POST",
+          headers:{Authorization:`Bearer ${token}`},
+          body:formData
+        });
+
+        const data=await res.json();
+
+        if(!res.ok)throw new Error(data.message);
+
+        showStatus("Submitted successfully","ok");
+        setTimeout(()=>window.location.href="services.html",1500);
+
+      }catch(err){
+        showStatus(err.message,"error");
+      }
+    }
+
+    function clearDraft(){
+      if(!confirm("Clear draft?"))return;
+      location.reload();
+    }
   </script>
 </body>
 </html>
