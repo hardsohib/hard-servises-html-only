@@ -346,7 +346,7 @@
 
       <div class="row">
         <label class="remember">
-          <input type="checkbox" />
+          <input type="checkbox" id="loginRemember" checked />
           Remember me
         </label>
         <a href="https://t.me/hardenglishtestadmin" target="_blank" class="forgot">Forget password?</a>
@@ -388,7 +388,7 @@
 
       <div class="row">
         <label class="remember">
-          <input type="checkbox" />
+          <input type="checkbox" id="registerRemember" checked />
           Remember me
         </label>
       </div>
@@ -413,9 +413,50 @@
     const confirmPassword = document.getElementById("confirmPassword");
     const loginError = document.getElementById("loginError");
     const registerError = document.getElementById("registerError");
+    const loginRemember = document.getElementById("loginRemember");
+    const registerRemember = document.getElementById("registerRemember");
 
-    
-    
+
+    function cleanPhone(value) {
+      let digits = String(value || "").replace(/\D/g, "");
+
+      if (digits.startsWith("998")) {
+        digits = digits.slice(0, 12);
+      } else {
+        digits = "998" + digits;
+        digits = digits.slice(0, 12);
+      }
+
+      return "+" + digits;
+    }
+
+    function isValidUzPhone(phone) {
+      return /^\+998\d{9}$/.test(phone);
+    }
+
+    function saveLoginSession(token, user, remember) {
+      if (remember) {
+        localStorage.setItem("token", token);
+        localStorage.setItem("user", JSON.stringify(user));
+        sessionStorage.removeItem("token");
+        sessionStorage.removeItem("user");
+      } else {
+        sessionStorage.setItem("token", token);
+        sessionStorage.setItem("user", JSON.stringify(user));
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+      }
+    }
+
+    function alreadyLoggedIn() {
+      const savedToken = localStorage.getItem("token") || sessionStorage.getItem("token");
+      if (savedToken) {
+        window.location.href = "services.html";
+      }
+    }
+
+    alreadyLoggedIn();
+
 
     function showForm(type) {
       loginError.style.display = "none";
@@ -506,10 +547,9 @@
   e.preventDefault();
   loginError.style.display = "none";
 
-  const phoneDigits = loginPhone.value.replace(/\D/g, "");
-  const fullPhone = "+" + phoneDigits;
+  const fullPhone = cleanPhone(loginPhone.value);
 
-  if (phoneDigits.length !== 12 || !phoneDigits.startsWith("998")) {
+  if (!isValidUzPhone(fullPhone)) {
     loginError.textContent = "Phone number must be a valid Uzbekistan number.";
     loginError.style.display = "block";
     return;
@@ -541,8 +581,7 @@
       return;
     }
 
-    localStorage.setItem("token", data.token);
-    localStorage.setItem("user", JSON.stringify(data.user));
+    saveLoginSession(data.token, data.user, loginRemember.checked);
 
     window.location.href = "services.html";
   } catch (error) {
@@ -557,8 +596,7 @@ registerForm.addEventListener("submit", async function(e) {
 
   const nameInput = registerForm.querySelector('input[type="text"]');
   const fullName = nameInput.value.trim();
-  const phoneDigits = registerPhone.value.replace(/\D/g, "");
-  const fullPhone = "+" + phoneDigits;
+  const fullPhone = cleanPhone(registerPhone.value);
 
   if (!fullName) {
     registerError.textContent = "Name is required.";
@@ -566,7 +604,7 @@ registerForm.addEventListener("submit", async function(e) {
     return;
   }
 
-  if (phoneDigits.length !== 12 || !phoneDigits.startsWith("998")) {
+  if (!isValidUzPhone(fullPhone)) {
     registerError.textContent = "Phone number must be a valid Uzbekistan number.";
     registerError.style.display = "block";
     return;
@@ -624,8 +662,7 @@ registerForm.addEventListener("submit", async function(e) {
       return;
     }
 
-    localStorage.setItem("token", loginData.token);
-    localStorage.setItem("user", JSON.stringify(loginData.user));
+    saveLoginSession(loginData.token, loginData.user, registerRemember.checked);
 
     window.location.href = "services.html";
   } catch (error) {
